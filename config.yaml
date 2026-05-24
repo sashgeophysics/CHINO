@@ -1,0 +1,54 @@
+model:
+  hidden_dim: 256
+  n_blocks: 6
+  n_heads: 4
+  time_embed_dim: 64
+  node_in_dim: 6       # c_in, S, x, y, t_in, Ra
+  edge_in_dim: 3       # delta_x, delta_y, distance
+
+training:
+  batch_size: 4
+  lr: 1.0e-4
+  lr_min: 5.0e-6
+  lr_warmup_epochs: 10
+  grad_clip: 1.0
+  max_hours: 6.0       # wall-time limit per resume run
+  ckpt_every: 25       # save checkpoint and loss history every N epochs
+  log_every: 5
+
+  # Loss weights
+  w_l2: 1.0
+  w_phys: 0.3
+  w_bc: 0.05
+
+curriculum:
+  # Ra curriculum: list of [start_epoch, ra_list] pairs
+  ra_schedule:
+    - [0,   [1577]]
+    - [150, [500, 1000, 1577]]
+  # Time-window curriculum: list of [start_epoch, delta_t_max] pairs
+  dt_schedule:
+    - [0,   0.5]
+    - [75,  1.0]
+    - [125, 2.0]
+
+data:
+  ra_list: [500, 1000, 1577]
+  n_seeds: 20
+  held_out_seeds: [17, 18, 19]
+  delta_t_max: 2.0
+  nx: 200
+  ny: 40
+  lx: 10.0
+  ly: 1.0
+
+physics:
+  pe: 317.0       # Peclet number
+  da_s: 1.0       # dissolution sink Damkohler number
+  da_inj: 0.005   # injection rate Damkohler number
+  gamma: 1.0      # buoyancy coefficient
+
+paths:
+  data_dir: data/ensemble        # root of FD ensemble .npz files
+  model_dir: checkpoints         # local checkpoint directory
+  fig_dir: figures               # output figures directory
