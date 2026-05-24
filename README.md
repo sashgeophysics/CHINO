@@ -1,148 +1,194 @@
-# MuPoPP (Multiphase Porous flow and Physical Properties) v 1.2.2
+# CHINO — CHanneling Instability Neural Operator
 
-This module contains functions for solving mass and moemntum conservation
-equations for single phase darcy flow, two-phase darcy flow, compaction, 
-reactive darcy flow, and reactive compaction flow equations. Each class
-contains the governing equations for the equations.
+[![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sashgeophysics/CHINO/blob/main/notebooks/CHINO_quickstart.ipynb)
 
-Detailed description of each class is provided within the classes. The solvers
-and boundary conditions should be set within the script files calling on the
-module functions. The multiphase physical properties are calculated by the 
-module mumap_fwd. See details for these calculations in the docs for mumap_fwd.
+CHINO is an attention-augmented graph neural operator for simulating
+**reactive infiltration instability** (RII) in porous media. Given the
+concentration field of a CO2 dissolution plume at an initial time, CHINO
+predicts the field at a later time — capturing the large-scale dynamics
+of convective fingering across 2000 years of geological carbon sequestration.
 
-Copyright Saswata Hier-Majumder, January 2018
-Modified by Joe Sun and Ryan Payton. 
-Works with Dolfin 2017.1.0
-Python 2.7
-Release 1.2.2, March 4, 2020
+---
 
+## Why CHINO?
 
-#Classes
+Reactive infiltration instability governs a wide range of geophysical processes:
+CO2 dissolution in saline aquifers, carbonate dissolution (karst formation),
+mantle melt channeling, and reactive fluid flow in fractured reservoirs.
+Numerical simulation of these systems is expensive because the fingering
+instability develops at fine spatial scales requiring high-resolution grids.
 
-This module contains a number of classes corresponding to different PDE problems. Some of the classes may not work properly. See below for a description of the classes that are currently working.
+CHINO learns the solution operator of the non-dimensional Darcy-Boussinesq
+system from an ensemble of finite-difference simulations, enabling rapid
+prediction of new realizations without running the solver.
 
-# Class compaction
+---
 
-   This class calculates the governing equations for a
-    deforming, viscous matrix, and a pore fluid occupying interstitial
-    spaces. The governing equations for momentum conservations
-    are given by the two PDEs
+## Key results
 
-    grad(alpha div(u))+div((1-phi)*symgrad(u))-grad(p)=h              (1)
-    div(u - (delta/L)**2 * phi**2 * m *grad(p)) = Da *(R/(1-R))*Gamma (2)
+| Time | L2 error (Ra=1577) |
+|---|---|
+| t = 0.5 (500 years) | 0.74 |
+| t = 1.0 (1000 years) | 0.43 |
+| t = 2.0 (2000 years) | **0.25** |
 
-    where u, the matrix velocity, and p,the modified fluid pressure,
-    are the two primary unknowns. phi is the spatially and temporally variable
-    melt volume fraction, delta is the compaction length, L 
-    is the characteristic length of the problem, m is mobility, Da is 
-    dimensionless Damkoehler number, R is the dimensionless density
-    contrast between the melt and the matrix, alpha is bulk viscosity,
-    and Gamma is the rate  of melt generation.
+At t=1.0, the model produces visible finger-like spatial structure.
+At t=2.0, the broad swept pattern of merged fingers is correctly
+captured with seed-specific left-right asymmetry.
 
-    The right hand side vector h comprises of buoyancy, surface tension,
-    and melt generation.
+---
 
-    Mass conservation is given by the time dependent equation
+## Quickstart
 
-    diff(phi,t) = div((1-phi)*u) + Gamma/rho                          (3)
+```python
+import torch
+from huggingface_hub import hf_hub_download
+from chino import AttentionMeshGraphNet
+from chino.dataset import build_graph
 
-    See the functions for these equations for weak formulation
+# Download weights
+ckpt = hf_hub_download("sashgeophysics/CHINO", "chino_best.pt",
+                        local_dir="checkpoints/")
 
-# Class darcy_two_phase (To be updated)
-    This class contains the variables and functions
-    for porous flow of a mixture of fluids. See Cheueh et al (2010)
-    for details of the governing equation and weak formulation.
-    The governing PDEs are given by
-    phi*diff(S,t) + div(F*u) = qw      (1)
-    div(u) = q                         (2) 
-    u = -D*lambda*k*grad(p)            (3)
-    where phi is the porposity, S is saturation, u is the velocity,
-    and q_w is source term for one of the fluid phases. The 
-    dimensionless quantity F is the ratio between mobility of the
-    fluid over the total mobility. 
-    q =qw+qo total source function
-    D is the diemnsionless Darcy number
-    lambda is the dimensionless mobility
-    and p is the modified pressure
+# Build model
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = AttentionMeshGraphNet().to(device)
+model.load_state_dict(torch.load(ckpt, map_location=device))
+model.eval()
 
-# Class  DarcyAdvection
+# Build graph (200x40 MAC grid, domain [0,10]x[0,1])
+edge_index, edge_attr, xc, yc, x_norm, y_norm = build_graph(
+    nx=200, ny=40, lx=10.0, ly=1.0, device=device
+)
 
-    This class solves for a simple advection-diffusion
-    equation for a single or multicomponent flow, the governing
-    PDEs for Darcy flow are:        
-    div(u) = 0                                                          (1)
-    phi*u = -k*(grad(p)-drho*zhat)                                      (2)
-    dc0/dt + dot(u,grad(c0)) = div(grad(c0))/Pe - Da*c0*c1/phi + beta*f (3)
-    and  
-    dc1/dt = - Da*c0*c1/phi                                             (4)
-    where c0 and c1 are concentrations of the reactants in the liquid
-    and solid, u is the fluid velocity, p is pressure, k is permeability
-    drho=difference between liquid and solid densities, zhat is a unit
-    vecotr in vertically upward direction, Pe is Peclet number, Da is
-    the Dahmkoler number, beta is source strength, f is a function
-    for lateral variations in source of c0, and phi is the constant porosity
+# Predict: c_in -> c_out at t_out=2.0
+# node_feats: (8000, 6) — [c_in_norm, S_norm, x_norm, y_norm, t_in_norm, Ra_norm]
+with torch.no_grad():
+    c_pred = model(node_feats, edge_index, edge_attr,
+                   t_out_norm=torch.tensor(1.0, device=device))
+# c_pred: (8000,) predicted concentration, non-negative
+```
 
-    On initiation of the class:
-              the dimensionless numbers, Pe, Da, alpha =beta*phi are loaded
-              the timestep dt and CFL criterion are also loaded to default
-              values.
-    For the remaining functions, see the docstring of each individual function
-    for help.
+---
 
-# Class StokesAdvection 
+## Installation
 
-  			      
-    This class solves for a simple advection-diffusion
-    equation for a single or multicomponent flow, the governing
-    PDEs for Stokes flow are:        
-    div(u) = 0                                                          (1)
-    -grad(p)+div(grad(u)) = 0                                        (2)
-    
-    This code is useful for reactive Stokes flow through a known geometry. The
-    sample file uses a simple geometry file, but it can also be used to read
-    in 3D microtomographic images of connected pore space in natural reservoirs.
-    
-    The function stokes_ADR_precipitation carries out the additional reactions
-    for a three component system, following the reaction
-    An + H2CO3 = Ka + CaCO3
- 
-    On initiation of the class:
-              the dimensionless numbers, Pe, Da, alpha =beta*phi are loaded
-              the timestep dt and CFL criterion are also loaded to default
-              values.
-    For the remaining functions, see the docstring of each individual function
-    for help.
-    
+```bash
+git clone https://github.com/sashgeophysics/CHINO.git
+cd CHINO
+conda env create -f environment.yml
+conda activate chino
+```
 
-# Class CCS
+---
 
-    This class solves for a simple advection-diffusion
-    equation for a single or multicomponent flow, the governing
-    PDEs for Darcy flow are:        
-    div(u) = 0                                                          (1)
-    phi*u = -k*(grad(p)-drho*zhat)                                      (2)
-    dc0/dt + dot(u,grad(c0)) = div(grad(c0))/Pe - Da*c0*c1/phi + beta*f (3)
-    dc1/dt = -fac1*Da*c0*c1/phi                                             (4)
-    and 
-    dc2/dt = fac2*Da*c0*c1/phi
-    where c0 and c1 are concentrations of the reactants in the liquid
-    and solid, u is the fluid velocity, p is pressure, k is permeability
-    drho=difference between liquid and solid densities, zhat is a unit
-    vecotr in vertically upward direction, Pe is Peclet number, Da is
-    the Dahmkoler number, beta is source strength, f is a function
-    for lateral variations in source of c0, and phi is the constant porosity.
-    c2 is the concentration of solid product, fac1 and fac2 are factors
-    to convert from volume fraction to mass fraction. The underlying chemical
-    reaction is
-    An + H2CO3 = Ka + CaCO3
-    c0 is the consentration of H2CO3 in the liquid
-    c1 is the concentration of An in the solid
-    c2 is the concentration of CaCO3 in the solid
+## Training from scratch
 
-    On initiation of the class:
-              the dimensionless numbers, Pe, Da, alpha =beta*phi are loaded
-              the timestep dt and CFL criterion are also loaded to default
-              values.
-    For the remaining functions, see the docstring of each individual function
-    for help.
+```bash
+# 1. Download training data (see data/README.md)
+# 2. Train
+python scripts/train.py --config config.yaml
 
+# 3. Resume from checkpoint (with 6-hour wall limit)
+python scripts/resume.py --config config.yaml --max_hours 6.0
+
+# 4. Evaluate on held-out seeds
+python scripts/evaluate.py --config config.yaml
+```
+
+All hyperparameters are in `config.yaml`.
+
+---
+
+## Repository structure
+
+```
+CHINO/
+├── config.yaml          # All hyperparameters
+├── environment.yml      # Conda environment
+├── chino/
+│   ├── model.py         # AttentionMeshGraphNet architecture
+│   ├── loss.py          # Anomaly L2 + physics + BC losses
+│   └── dataset.py       # RealisationDataset and graph construction
+├── scripts/
+│   ├── train.py         # Train from scratch
+│   ├── resume.py        # Resume with wall-time limit
+│   └── evaluate.py      # Evaluation and visualization
+├── notebooks/
+│   └── CHINO_quickstart.ipynb
+├── weights/
+│   └── README.md        # Download instructions
+├── data/
+│   └── README.md        # Data format and download instructions
+└── docs/
+    └── model_card.md
+```
+
+---
+
+## Physical background
+
+CHINO solves the surrogate problem for the non-dimensional
+Darcy-Boussinesq system:
+
+```
+u = -Ra * dp'/dx
+v = -Ra * (dp'/dy + gamma * c)
+laplacian(p') = -gamma * Ra * dc/dy
+dc/dt + u*dc/dx + v*dc/dy = (1/Pe)*laplacian(c) - Da_S*c + Da_inj*S(x,y)
+```
+
+At Ra=1577, convective fingers develop with characteristic width ~0.025
+domain units. Pressure couples the entire domain instantaneously via the
+Poisson equation — the key physical non-locality that standard
+message-passing graph neural networks cannot represent with a finite
+number of hops.
+
+CHINO resolves this with full N^2 multi-head self-attention (N=8000 nodes),
+giving every node global access in one operation.
+
+---
+
+## Extending CHINO
+
+CHINO is designed to generalize beyond CCS:
+
+- **New parameter regimes:** adjust `ra_list`, `pe`, `da_s`, `da_inj` in
+  `config.yaml` and regenerate the training ensemble
+- **3D:** replace the 2D MAC grid with a 3D tetrahedral mesh; the
+  `AttentionMeshGraphNet` architecture requires only changes to
+  `build_graph()` in `chino/dataset.py`
+- **Other RII systems:** karst dissolution, mantle melt channels, reactive
+  fracture flow — the architecture is physics-agnostic; replace the source
+  term and boundary conditions
+
+---
+
+## Citation
+
+```bibtex
+@software{hier_majumder_2025_chino,
+  author    = {Hier-Majumder, Saswata},
+  title     = {CHINO: CHanneling Instability Neural Operator},
+  year      = {2025},
+  license   = {Apache-2.0},
+  url       = {https://github.com/sashgeophysics/CHINO}
+}
+
+@article{sun2020geological,
+  title   = {Geological Carbon Sequestration by Reactive Infiltration Instability},
+  author  = {Sun, Yizhuo and Payton, Ryan L. and Hier-Majumder, Saswata and Kingdon, Andrew},
+  journal = {Frontiers in Earth Science},
+  volume  = {8},
+  pages   = {533588},
+  year    = {2020},
+  doi     = {10.3389/feart.2020.533588}
+}
+```
+
+---
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE).
