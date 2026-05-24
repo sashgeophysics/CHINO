@@ -2,7 +2,9 @@
 
 The CHINO training ensemble is hosted on Zenodo:
 
-**https://zenodo.org/record/XXXXXXX** *(DOI assigned on upload)*
+**https://zenodo.org/record/20368449**
+
+DOI: [10.5281/zenodo.20368449](https://doi.org/10.5281/zenodo.20368449)
 
 ## Download
 
@@ -11,7 +13,7 @@ The CHINO training ensemble is hosted on Zenodo:
 pip install zenodo_get
 
 # Download the full ensemble (~500 MB)
-zenodo_get XXXXXXX -o data/
+zenodo_get 20368449 -o data/
 ```
 
 ## Directory structure
