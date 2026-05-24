@@ -2,7 +2,7 @@
 
 Pre-trained CHINO v1.0 weights are hosted on HuggingFace:
 
-**https://huggingface.co/hier-majumder/CHINO**
+**https://huggingface.co/sashgeophysics/CHINO**
 
 ## Download
 
@@ -10,7 +10,7 @@ Pre-trained CHINO v1.0 weights are hosted on HuggingFace:
 from huggingface_hub import hf_hub_download
 
 ckpt_path = hf_hub_download(
-    repo_id="hier-majumder/CHINO",
+    repo_id="sashgeophysics/CHINO",
     filename="chino_best.pt",
     local_dir="checkpoints/",
 )
@@ -20,7 +20,7 @@ Or via the command line:
 
 ```bash
 pip install huggingface_hub
-huggingface-cli download hier-majumder/CHINO chino_best.pt --local-dir checkpoints/
+huggingface-cli download sashgeophysics/CHINO chino_best.pt --local-dir checkpoints/
 ```
 
 ## Checkpoint details
