@@ -1,3 +1,18 @@
+---
+license: apache-2.0
+language:
+  - en
+tags:
+  - geoscience
+  - porous-media
+  - neural-operator
+  - carbon-sequestration
+  - graph-neural-network
+  - reactive-infiltration
+  - pytorch
+library_name: pytorch
+---
+
 # Model Card — CHINO v1.0
 
 ## Model Description
@@ -103,8 +118,7 @@ captured with correct left-right asymmetry.
 
 - **Early-time prediction (t=0.5):** L2=0.74. Finger nucleation at short
   times is controlled by sub-grid perturbations and is not predictable
-  deterministically. A diffusion-model-based probabilistic operator
-  would be the appropriate extension.
+  deterministically.
 - **Individual finger positions:** Not reproduced. The chaotic nature of
   the Rayleigh-Taylor instability at Ra=1577 means finger positions are
   sensitive to initial conditions at scales below the grid resolution.
@@ -130,12 +144,12 @@ If you use CHINO, please cite:
 }
 
 @article{sun2020geological,
-  title     = {Geological Carbon Sequestration by Reactive Infiltration Instability},
-  author    = {Sun, Yizhuo and Payton, Ryan L. and Hier-Majumder, Saswata and Kingdon, Andrew},
-  journal   = {Frontiers in Earth Science},
-  volume    = {8},
-  pages     = {533588},
-  year      = {2020},
-  doi       = {10.3389/feart.2020.533588}
+  title   = {Geological Carbon Sequestration by Reactive Infiltration Instability},
+  author  = {Sun, Yizhuo and Payton, Ryan L. and Hier-Majumder, Saswata and Kingdon, Andrew},
+  journal = {Frontiers in Earth Science},
+  volume  = {8},
+  pages   = {533588},
+  year    = {2020},
+  doi     = {10.3389/feart.2020.533588}
 }
 ```
