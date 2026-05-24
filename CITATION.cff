@@ -14,7 +14,7 @@ abstract: >
 authors:
   - family-names: Hier-Majumder
     given-names: Saswata
-    affiliation: "Royal Holloway, University of London"
+
     orcid: "https://orcid.org/0000-0001-6937-8078"
 license: Apache-2.0
 version: 1.0.0
